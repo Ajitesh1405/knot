@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>Knot — Knowledge Graph</title>
+    <!-- Telegram Mini App SDK (no-op when opened in a normal browser) -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui;
+        background: #0f172a;
+        color: #e2e8f0;
+        overflow: hidden;
+      }
+      /* Column layout so the graph always fills the viewport minus header */
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      #header {
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-bottom: 1px solid #334155;
+      }
+      #header h1 {
+        margin: 0;
+        font-size: 13px;
+      }
+      #status {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+      }
+      #graph {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0; /* let flex shrink the canvas correctly */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="header">
+      <h1>🧠 Knot — Knowledge Graph</h1>
+      <div id="status">connecting…</div>
+    </div>
+    <div id="graph"></div>
+
+    <script>
+      const container = document.getElementById('graph');
+      const status = document.getElementById('status');
+
+      // ─── Telegram Mini App: expand to full height + theme ───────────
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      // ─── Resolve userId: URL param → localStorage → TG user → prompt ─
+      const params = new URLSearchParams(location.search);
+      let userId = params.get('userId') || localStorage.getItem('userId');
+      if (!userId && tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        userId = 'tg-' + tg.initDataUnsafe.user.id;
+      }
+      if (!userId) {
+        userId = prompt(
+          'Enter your userId\n\n' +
+            'Telegram user: tg-<your chat id>\n' +
+            '(Get your chat ID by messaging @userinfobot on Telegram)',
+        );
+      }
+      // Remember whatever we resolved (URL param wins and is persisted).
+      if (userId) localStorage.setItem('userId', userId);
+
+      // Show whose graph is being viewed + give a way to switch
+      document.getElementById('header').insertAdjacentHTML(
+        'beforeend',
+        `<div style="font-size:11px;color:#94a3b8;margin-top:2px">
+    viewing: <b>${userId}</b>
+    <a href="#" style="color:#60a5fa;margin-left:8px" id="switch">switch</a>
+  </div>`,
+      );
+      document.getElementById('switch').addEventListener('click', (e) => {
+        e.preventDefault();
+        localStorage.removeItem('userId');
+        location.href = location.pathname; // drop ?userId so the prompt shows
+      });
+
+      const nodes = new vis.DataSet([]);
+      const edges = new vis.DataSet([]);
+
+      const network = new vis.Network(
+        container,
+        { nodes, edges },
+        {
+          nodes: {
+            shape: 'dot',
+            size: 18,
+            font: { color: '#e2e8f0', size: 14 },
+            borderWidth: 2,
+          },
+          edges: {
+            arrows: 'to',
+            color: { color: '#64748b' },
+            font: { color: '#94a3b8', size: 11, strokeWidth: 0 },
+            smooth: { type: 'continuous' },
+          },
+          // Dampened physics: stabilize once, then freeze so a fat-fingered
+          // touch-drag on mobile can't fling nodes off-screen.
+          physics: {
+            stabilization: { enabled: true, iterations: 200 },
+            barnesHut: { gravitationalConstant: -3000, springLength: 140 },
+          },
+          interaction: {
+            hover: false,
+            dragNodes: true,
+            dragView: true,
+            zoomView: true,
+            tooltipDelay: 200,
+          },
+        },
+      );
+
+      // Freeze layout after initial stabilization (nodes stay put on drag).
+      network.once('stabilizationIterationsDone', () => {
+        network.setOptions({ physics: false });
+      });
+
+      const colorFor = (label) => {
+        const palette = {
+          Person: '#60a5fa',
+          Place: '#34d399',
+          Topic: '#fbbf24',
+          Preference: '#f472b6',
+          User: '#a78bfa',
+        };
+        return palette[label] || '#94a3b8';
+      };
+
+      async function refresh() {
+        try {
+          const res = await fetch(
+            `/agent/memory/${encodeURIComponent(userId)}`,
+          );
+          const data = await res.json();
+
+          const currentIds = new Set(nodes.getIds());
+          const incomingIds = new Set();
+          for (const n of data.nodes ?? []) {
+            incomingIds.add(n.name);
+            if (!currentIds.has(n.name)) {
+              nodes.add({
+                id: n.name,
+                label: n.name,
+                color: colorFor(n.label),
+                title: n.label,
+              });
+            }
+          }
+          for (const id of currentIds) {
+            if (!incomingIds.has(id)) nodes.remove(id);
+          }
+
+          edges.clear();
+          for (const e of data.edges ?? []) {
+            edges.add({
+              from: e.from,
+              to: e.to,
+              label: e.type.toLowerCase().replace(/_/g, ' '),
+            });
+          }
+
+          status.textContent = `${(data.nodes ?? []).length} nodes · ${(data.edges ?? []).length} edges · ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+          status.textContent = 'error: ' + err.message;
+        }
+      }
+
+      refresh();
+      setInterval(refresh, 2000);
+    </script>
+  </body>
+</html>

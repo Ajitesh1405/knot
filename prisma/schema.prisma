@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User settings — one row per user (for now, just you) ─────────
+model UserSettings {
+  id             String   @id @default(cuid())
+  userId         String   @unique           // Telegram chat ID or future user ID
+  scope          String   @default("personal")     // "personal" | "everything"
+  emailRange     String   @default("new_only")     // "new_only" | "last_30_days" | "last_year" | "all"
+  gmailRefreshToken String?                        // OAuth, set after Gmail auth
+  outlookRefreshToken String?                      // OAuth, set after Outlook auth
+  briefingsEnabled Boolean @default(false)         // proactive meeting briefings opt-in
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ─── Email drafts awaiting human approval (HITL) ─────────────────
+// App-level registry for /pending + 1h timeout. The LangGraph state
+// itself lives in the PostgresSaver checkpointer tables (thread_id = id).
+model PendingDraft {
+  id        String   @id // == LangGraph thread_id
+  userId    String
+  chatId    String? // Telegram chat to update on resume/expiry
+  messageId String? // Telegram message carrying the approval buttons
+  recipient String   @default("")
+  subject   String   @default("")
+  status    String   @default("awaiting_approval") // awaiting_sender | awaiting_approval | sent | cancelled | expired | error
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── Meeting drafts awaiting approval (HITL scheduler, Phase 7B) ─
+model MeetingDraft {
+  id        String   @id // == LangGraph thread_id
+  userId    String
+  chatId    String?
+  messageId String? // Telegram message carrying the approval buttons
+  summary   String   @default("")
+  status    String   @default("awaiting_approval") // awaiting_email | awaiting_approval | awaiting_edit | scheduled | cancelled | no_slot | error
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+}
+
+// ─── Meetings already briefed — dedupe so the cron can't double-fire ─
+model MeetingBriefing {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  briefedAt DateTime @default(now())
+
+  @@unique([userId, eventId])
+}
+
+// ─── Last-seen Gmail message ID per user — so we know what's NEW ──
+model GmailWatermark {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  lastMessageId   String?
+  lastSyncedAt    DateTime @default(now())
+}

@@ -1,0 +1,61 @@
+# Knot — full stack: Postgres + Neo4j + the app.
+#   1. cp .env.example .env  and fill in tokens/keys
+#   2. docker compose up -d --build
+# The app container runs `prisma migrate deploy` on boot, so the database is
+# created automatically. Inside compose, DB/Neo4j hosts are the service names
+# (overridden below) — your .env can keep localhost for running outside Docker.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: knot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: knot
+      POSTGRES_PASSWORD: knot
+      POSTGRES_DB: knot
+    ports:
+      - '5432:5432'
+    volumes:
+      - knot-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U knot']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  neo4j:
+    image: neo4j:5
+    container_name: knot-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/please-change-me
+    ports:
+      - '7474:7474' # browser
+      - '7687:7687' # bolt
+    volumes:
+      - knot-neo4j-data:/data
+
+  app:
+    build: .
+    container_name: knot-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      # Container hostnames override whatever your .env has (which may be localhost).
+      DATABASE_URL: postgresql://knot:knot@postgres:5432/knot?schema=public
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: please-change-me
+    ports:
+      - '3038:3038'
+
+volumes:
+  knot-postgres-data:
+  knot-neo4j-data:
