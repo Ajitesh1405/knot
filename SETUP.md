@@ -54,6 +54,18 @@ GOOGLE_CLIENT_SECRET=xxxx
 GOOGLE_REDIRECT_URI=https://YOUR_PUBLIC_URL/auth/google/callback
 ```
 
+> **⚠️ You do NOT need Google to "verify" the app for personal use.** While the
+> consent screen is in **Testing**, add yourself under **Test users** and you can
+> use Gmail/Calendar scopes immediately. Two things to know:
+> - During `/connect_gmail` you'll see an **"unverified app"** warning →
+>   **Advanced → Go to {app} → Continue**. Expected for a self-hosted app.
+> - **In Testing mode, refresh tokens expire after ~7 days**, so the bot loses
+>   access weekly. To avoid that, click **Publish app** (→ "In production") on the
+>   OAuth consent screen — for a personal project where you own the Cloud project,
+>   this works right away and **still doesn't require formal verification**. Full
+>   verification (security assessment) is only needed to let *other people's*
+>   accounts connect without warnings.
+
 ### 1.5 Microsoft OAuth (Outlook) — optional
 [Azure Portal](https://portal.azure.com) → **Microsoft Entra ID → App registrations → New registration**:
 - Account types: **any org directory + personal Microsoft accounts**

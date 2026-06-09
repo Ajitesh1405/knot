@@ -2,27 +2,29 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Install deps (with dev deps for the build).
+# Copy manifest + schema first so the `postinstall` (prisma generate) works.
 COPY package*.json ./
-RUN npm ci
+COPY prisma ./prisma
+RUN npm ci                      # postinstall runs `prisma generate`
 
-# Generate Prisma client + compile.
+# Compile.
 COPY . .
-RUN npx prisma generate && npm run build
+RUN npm run build
 
 # ── Runtime stage ────────────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Prod deps only — `prisma` is a runtime dep (for `migrate deploy`), so it
+# stays. Schema is present, so postinstall regenerates the client here too.
 COPY package*.json ./
+COPY prisma ./prisma
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Bring over the build output, Prisma schema/migrations, generated client, and static assets.
+# Build output, Prisma config, static assets.
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/public ./public
 
 EXPOSE 3038
