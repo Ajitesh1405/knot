@@ -8,6 +8,22 @@ Self-hostable. Privacy-first. Your Postgres + your Neo4j + your own LLM key = th
 
 ---
 
+## ⚡ Quick start
+
+```bash
+git clone <your-repo-url> knot && cd knot
+cp .env.example .env          # then fill in your keys (see below)
+docker compose up -d --build  # starts Postgres + Neo4j + the app, runs migrations
+```
+Then open your bot in Telegram → `/start` → `/connect_gmail`.
+
+You'll need to drop a few credentials into `.env` first — a **Telegram bot token**, an **Anthropic API key**, a **Google OAuth client**, and a **public HTTPS URL** (a domain, or an ngrok tunnel for testing). It's ~15 minutes, one-time, and every step is in **[SETUP.md](SETUP.md)**.
+
+> No Docker? Use a managed Postgres + Neo4j (free tiers) and run with Node:
+> `npm install && npx prisma migrate deploy && npm run build && npm run start:prod`. Full details in [SETUP.md](SETUP.md).
+
+---
+
 ## ✨ What it can do
 
 - 💬 **Just chat** — small talk, "what's the date", "weather in Mumbai" (live), "what can you do".
