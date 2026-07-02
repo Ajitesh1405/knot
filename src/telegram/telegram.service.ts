@@ -19,6 +19,7 @@ import {
   SchedulerHitlService,
   SchedulerEvent,
 } from '../agent/scheduler-hitl.service';
+import { MobileUserService } from '../mobile/mobile-user.service';
 
 // In edit mode, only treat the message as "cancel" when it's essentially
 // JUST an abort word — NOT any sentence containing "don't" (e.g. "don't
@@ -45,6 +46,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     private readonly scheduler: SchedulerHitlService,
     private readonly outlook: OutlookService,
     private readonly briefingScheduler: BriefingScheduler,
+    private readonly mobileUsers: MobileUserService,
   ) {}
 
   async onModuleInit() {
@@ -205,6 +207,19 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
+    // ─── /pair — issue a code to log the mobile app in ──────────
+    this.bot.onText(/^\/pair$/, async (msg) => {
+      const userId = `tg-${msg.from?.id ?? msg.chat.id}`;
+      const { code } = await this.mobileUsers.createPairCode(userId);
+      await this.bot.sendMessage(
+        msg.chat.id,
+        `📱 Your pairing code: *${code}*\n\n` +
+          'Enter it in the mobile app within 10 minutes to sign in. ' +
+          'It works once.',
+        { parse_mode: 'Markdown' },
+      );
+    });
+
     // ─── /connect_outlook — Microsoft OAuth ─────────────────────
     this.bot.onText(/^\/connect_outlook$/, async (msg) => {
       const userId = `tg-${msg.from?.id ?? msg.chat.id}`;
@@ -260,6 +275,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           '  /schedule <who + when> — set up a meeting\n' +
           '  /briefings on | off | test — pre-meeting pings\n' +
           '  /graph — open your knowledge graph\n' +
+          '  /pair — sign the mobile app in\n' +
           '  /settings — show settings\n' +
           '  /scope personal | everything\n' +
           '  /range new | 30 | year | all',

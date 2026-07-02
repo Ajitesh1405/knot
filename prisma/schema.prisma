@@ -69,3 +69,25 @@ model GmailWatermark {
   lastMessageId   String?
   lastSyncedAt    DateTime @default(now())
 }
+
+// ─── Mobile: short-lived pairing code (issued via Telegram /pair) ─
+model MobilePairCode {
+  code      String   @id // 6-digit code the user types into the app
+  userId    String // the Telegram-derived userId this code will bind to
+  expiresAt DateTime // codes are single-use and short-lived
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Mobile: a paired device holding a long-lived bearer token ────
+model MobileDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique // bearer token the app sends in Authorization
+  name       String? // optional device label
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}

@@ -5,6 +5,7 @@ import { SettingsModule } from '../settings/settings.module'; // ← NEW
 import { GmailModule } from '../gmail/gmail.module';
 import { OutlookModule } from '../outlook/outlook.module';
 import { CalendarModule } from '../calendar/calendar.module';
+import { MobileModule } from '../mobile/mobile.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CalendarModule } from '../calendar/calendar.module';
     GmailModule,
     OutlookModule,
     CalendarModule,
+    MobileModule,
   ],
   providers: [TelegramService],
 })
