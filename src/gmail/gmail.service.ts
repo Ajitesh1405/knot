@@ -3,6 +3,22 @@ import { google, gmail_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
 
+// A Gmail message parsed into the clean shape the rest of the app uses.
+export interface ParsedEmail {
+  id: string;
+  threadId: string;
+  messageId: string; // RFC 2822 Message-ID header (for In-Reply-To)
+  from: string;
+  to: string;
+  cc: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body: string;
+  labelIds: string[]; // Gmail labels, e.g. CATEGORY_PROMOTIONS, UNREAD
+  listUnsubscribe: boolean; // has a List-Unsubscribe header → bulk/newsletter
+}
+
 @Injectable()
 export class GmailService {
   constructor(private readonly db: PrismaService) {}
@@ -103,7 +119,7 @@ export class GmailService {
   }
 
   // ─── Parse a Gmail message into a clean shape ───────────────────────
-  private parseEmail(msg: gmail_v1.Schema$Message) {
+  private parseEmail(msg: gmail_v1.Schema$Message): ParsedEmail {
     const headers = msg.payload?.headers ?? [];
     const get = (name: string) =>
       headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())
@@ -115,11 +131,78 @@ export class GmailService {
       messageId: get('Message-ID'), // RFC 2822 header — needed for In-Reply-To
       from: get('From'),
       to: get('To'),
+      cc: get('Cc'),
       subject: get('Subject'),
       date: get('Date'),
       snippet: msg.snippet ?? '',
       body: this.extractBody(msg.payload),
+      labelIds: msg.labelIds ?? [],
+      listUnsubscribe: !!get('List-Unsubscribe'),
     };
+  }
+
+  // ─── The connected account's own email address (cached-free, cheap) ──
+  async getProfileEmail(userId: string): Promise<string> {
+    const gmail = await this.clientFor(userId);
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    return (profile.data.emailAddress ?? '').toLowerCase();
+  }
+
+  // ─── New inbound mail since the last watermark ──────────────────────
+  // Scans the newest `maxScan` primary-inbox messages and returns those
+  // that arrived after the stored watermark (exclusive), oldest-first so
+  // callers process chronologically. `newestId` is the new high-water mark
+  // the caller should persist via setWatermark() AFTER processing succeeds.
+  async fetchNewSince(
+    userId: string,
+    maxScan = 25,
+  ): Promise<{ emails: ParsedEmail[]; newestId?: string }> {
+    const gmail = await this.clientFor(userId);
+    const wm = await this.db.gmailWatermark.findUnique({ where: { userId } });
+    const lastId = wm?.lastMessageId ?? null;
+
+    const list = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: maxScan,
+      q: 'in:inbox category:primary',
+    });
+    const ids = (list.data.messages ?? []).map((m) => m.id!).filter(Boolean);
+    if (ids.length === 0) return { emails: [], newestId: lastId ?? undefined };
+
+    const newestId = ids[0];
+    // First run (no watermark): don't flood — record the high-water mark and
+    // treat nothing as "new" this pass. We only act on mail arriving from now.
+    if (!lastId) return { emails: [], newestId };
+
+    // Collect ids newer than the watermark (list is newest-first).
+    const newIds: string[] = [];
+    for (const id of ids) {
+      if (id === lastId) break;
+      newIds.push(id);
+    }
+    if (newIds.length === 0) return { emails: [], newestId };
+
+    const parsed = await Promise.all(
+      newIds.map(async (id) => {
+        const full = await gmail.users.messages.get({
+          userId: 'me',
+          id,
+          format: 'full',
+        });
+        return this.parseEmail(full.data);
+      }),
+    );
+
+    return { emails: parsed.reverse(), newestId }; // oldest-first
+  }
+
+  // Persist the high-water mark so the next sweep only sees newer mail.
+  async setWatermark(userId: string, lastMessageId: string): Promise<void> {
+    await this.db.gmailWatermark.upsert({
+      where: { userId },
+      update: { lastMessageId, lastSyncedAt: new Date() },
+      create: { userId, lastMessageId },
+    });
   }
 
   // ─── Find distinct senders matching a name/address ──────────────────

@@ -10,6 +10,7 @@ import { SettingsModule } from './settings/settings.module'; // ← NEW
 import { GmailModule } from './gmail/gmail.module';
 import { AuthModule } from './auth/auth.module';
 import { LlmModule } from './llm/llm.module';
+import { ProactiveModule } from './proactive/proactive.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { LlmModule } from './llm/llm.module';
     GmailModule,
     AuthModule,
     LlmModule,
+    ProactiveModule,
   ],
 })
 export class AppModule {}

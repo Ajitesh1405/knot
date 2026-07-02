@@ -16,6 +16,7 @@ model UserSettings {
   gmailRefreshToken String?                        // OAuth, set after Gmail auth
   outlookRefreshToken String?                      // OAuth, set after Outlook auth
   briefingsEnabled Boolean @default(false)         // proactive meeting briefings opt-in
+  autoDraftEnabled Boolean @default(false)         // proactive auto-draft replies opt-in
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

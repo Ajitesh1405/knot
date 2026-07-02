@@ -205,6 +205,24 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
+    // ─── /autodraft on | off — proactive auto-draft replies ─────
+    this.bot.onText(/^\/autodraft (on|off)$/, async (msg, match) => {
+      const userId = `tg-${msg.from?.id ?? msg.chat.id}`;
+      const chatId = msg.chat.id;
+      if (match![1] === 'on') {
+        await this.settings.setAutoDraft(userId, true);
+        await this.bot.sendMessage(
+          chatId,
+          '📥 Auto-draft on — hourly, I’ll draft replies to new emails that ' +
+            'need one and send you an Approve/Edit/Cancel card. Nothing sends ' +
+            'without your tap.',
+        );
+      } else {
+        await this.settings.setAutoDraft(userId, false);
+        await this.bot.sendMessage(chatId, '📴 Auto-draft off.');
+      }
+    });
+
     // ─── /connect_outlook — Microsoft OAuth ─────────────────────
     this.bot.onText(/^\/connect_outlook$/, async (msg) => {
       const userId = `tg-${msg.from?.id ?? msg.chat.id}`;
@@ -259,6 +277,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           '  /next meeting — next meeting + briefing\n' +
           '  /schedule <who + when> — set up a meeting\n' +
           '  /briefings on | off | test — pre-meeting pings\n' +
+          '  /autodraft on | off — proactive reply drafts\n' +
           '  /graph — open your knowledge graph\n' +
           '  /settings — show settings\n' +
           '  /scope personal | everything\n' +

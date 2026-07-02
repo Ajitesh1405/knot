@@ -40,6 +40,14 @@ export class SettingsService {
     });
   }
 
+  async setAutoDraft(userId: string, enabled: boolean) {
+    return this.db.userSettings.upsert({
+      where: { userId },
+      update: { autoDraftEnabled: enabled },
+      create: { userId, autoDraftEnabled: enabled },
+    });
+  }
+
   async disconnectGmail(userId: string) {
     return this.db.userSettings.update({
       where: { userId },
