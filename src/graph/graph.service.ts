@@ -40,8 +40,16 @@ export class GraphService implements OnModuleInit, OnModuleDestroy {
   ) {
     const session = this.driver.session();
     try {
+      // MERGE (not MATCH) both endpoints so the edge is never silently
+      // dropped when an extracted relation references a name that wasn't
+      // upserted as an entity (e.g. case differences, or endpoints that
+      // only appear in `relations`). ON CREATE tags new endpoints so they
+      // still carry a label for the graph view / fact serialization.
       await session.run(
-        `MATCH (a { name: $from, ownerId: $userId }), (b { name: $to, ownerId: $userId })
+        `MERGE (a { name: $from, ownerId: $userId })
+         ON CREATE SET a:Entity
+       MERGE (b { name: $to, ownerId: $userId })
+         ON CREATE SET b:Entity
        MERGE (a)-[r:${this.safeLabel(relation)}]->(b)
        RETURN r`,
         { from: fromName, to: toName, userId },
@@ -97,10 +105,28 @@ export class GraphService implements OnModuleInit, OnModuleDestroy {
     const { nodes, edges } = await this.getAll(userId);
     if (nodes.length === 0) return '(nothing taught yet)';
 
-    const lines = edges.map(
-      (e) => `${e.from} ${e.type.toLowerCase().replace(/_/g, ' ')} ${e.to}`,
-    );
-    return lines.join('\n');
+    const lines: string[] = [];
+
+    // Relationship facts, e.g. "User lives in Delhi".
+    for (const e of edges) {
+      lines.push(`${e.from} ${e.type.toLowerCase().replace(/_/g, ' ')} ${e.to}`);
+    }
+
+    // Standalone facts: nodes not connected by any edge would otherwise be
+    // invisible to search (e.g. a bare "coffee" Preference node). Surface
+    // them as "name (label)" so the Q&A prompt can use them too.
+    const linked = new Set<string>();
+    for (const e of edges) {
+      linked.add(e.from);
+      linked.add(e.to);
+    }
+    for (const n of nodes) {
+      if (!linked.has(n.name)) {
+        lines.push(n.label ? `${n.name} (${n.label})` : n.name);
+      }
+    }
+
+    return lines.length ? lines.join('\n') : '(nothing taught yet)';
   }
 
   // ─── Facts about one entity (1-hop neighbourhood) as readable text ──

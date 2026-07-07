@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { Subject } from 'rxjs';
 import { Command } from '@langchain/langgraph';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
+import { serializeCheckpointerSetup } from './checkpointer-setup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { SchedulerSpecialist } from './scheduler.specialist';
@@ -60,7 +61,8 @@ export class SchedulerHitlService implements OnModuleInit {
     this.checkpointer = PostgresSaver.fromConnString(process.env.DATABASE_URL!, {
       schema: 'langgraph',
     });
-    await this.checkpointer.setup(); // idempotent; shares the checkpoint tables
+    // Serialized against the compose graph's setup — see checkpointer-setup.util.
+    await serializeCheckpointerSetup(() => this.checkpointer.setup()); // idempotent; shares the checkpoint tables
     this.graph = buildSchedulerGraph({
       scheduler: this.scheduler,
       calendar: this.calendar,

@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import { Subject } from 'rxjs';
 import { Command } from '@langchain/langgraph';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
+import { serializeCheckpointerSetup } from './checkpointer-setup.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { GmailService } from '../gmail/gmail.service';
 import { ComposeSpecialist } from './compose.specialist';
@@ -58,7 +59,8 @@ export class ComposeHitlService implements OnModuleInit, OnModuleDestroy {
     this.checkpointer = PostgresSaver.fromConnString(process.env.DATABASE_URL!, {
       schema: 'langgraph',
     });
-    await this.checkpointer.setup(); // creates the schema + checkpoint tables
+    // Serialized against the scheduler graph's setup — see checkpointer-setup.util.
+    await serializeCheckpointerSetup(() => this.checkpointer.setup()); // creates the schema + checkpoint tables
     this.graph = buildComposeGraph({
       compose: this.compose,
       gmail: this.gmail,
