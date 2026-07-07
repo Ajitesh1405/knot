@@ -147,7 +147,8 @@ export class OutlookService {
   }
 
   async disconnect(userId: string): Promise<void> {
-    await this.db.userSettings.update({
+    // updateMany → no-op (not a 500) if the user has no settings row yet.
+    await this.db.userSettings.updateMany({
       where: { userId },
       data: { outlookRefreshToken: null },
     });

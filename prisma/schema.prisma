@@ -7,6 +7,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── App user accounts (mobile / web login) ──────────────────────
+// Identity for the mobile app. The rest of the system keys off a
+// string `userId`; for these accounts that id is `usr-<User.id>`
+// (mirrors the `tg-<id>` namespace used for Telegram users), so
+// Telegram and mobile users can coexist without colliding.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 // ─── User settings — one row per user (for now, just you) ─────────
 model UserSettings {
   id             String   @id @default(cuid())

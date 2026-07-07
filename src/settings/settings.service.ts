@@ -41,7 +41,8 @@ export class SettingsService {
   }
 
   async disconnectGmail(userId: string) {
-    return this.db.userSettings.update({
+    // updateMany → no-op (not a 500) if the user has no settings row yet.
+    return this.db.userSettings.updateMany({
       where: { userId },
       data: { gmailRefreshToken: null },
     });
