@@ -39,9 +39,9 @@ export class CalendarService {
   // Same OAuth pattern as GmailService — reuses the shared Google client.
   private buildOAuthClient(): OAuth2Client {
     return new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID!,
-      process.env.GOOGLE_CLIENT_SECRET!,
-      process.env.GOOGLE_REDIRECT_URI!,
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI,
     );
   }
 
@@ -175,7 +175,10 @@ export class CalendarService {
       location: e.location ?? '',
       hangoutLink: e.hangoutLink ?? '',
       organizer: e.organizer
-        ? { email: e.organizer.email ?? '', name: e.organizer.displayName ?? '' }
+        ? {
+            email: e.organizer.email ?? '',
+            name: e.organizer.displayName ?? '',
+          }
         : null,
       attendees,
     };
@@ -375,10 +378,16 @@ export class CalendarService {
       return { start: at(t, startHr), end: at(t, endHr) };
     }
     if (h.includes('week')) {
-      return { start: new Date().toISOString(), end: at(this.addDays(today, 7), 18) };
+      return {
+        start: new Date().toISOString(),
+        end: at(this.addDays(today, 7), 18),
+      };
     }
     // Vague hint → search the next 3 days.
-    return { start: new Date().toISOString(), end: at(this.addDays(today, 3), 18) };
+    return {
+      start: new Date().toISOString(),
+      end: at(this.addDays(today, 3), 18),
+    };
   }
 
   // ─── Timezone-aware day boundaries for today/tomorrow/this_week ─────

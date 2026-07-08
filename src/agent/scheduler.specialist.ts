@@ -47,7 +47,10 @@ export type MeetingProposal = {
 @Injectable()
 export class SchedulerSpecialist {
   private readonly logger = new Logger(SchedulerSpecialist.name);
-  private readonly intentChain: Runnable<Record<string, string>, SchedulerIntent>;
+  private readonly intentChain: Runnable<
+    Record<string, string>,
+    SchedulerIntent
+  >;
   private readonly reviseChain: Runnable<
     Record<string, string>,
     z.infer<typeof ReviseSchema>
@@ -95,7 +98,12 @@ export class SchedulerSpecialist {
       // Don't crash the flow — fall back to "no attendees" so the graph asks
       // who to invite instead of erroring out.
       this.logger.warn(`intent parse failed, degrading: ${err.message}`);
-      return { attendees: [], durationMins: 30, timeHint: '', summary: 'Meeting' };
+      return {
+        attendees: [],
+        durationMins: 30,
+        timeHint: '',
+        summary: 'Meeting',
+      };
     }
   }
 
@@ -112,10 +120,7 @@ export class SchedulerSpecialist {
   }
 
   // ─── Resolve names → emails. NEVER invents an address. ──────────────
-  async resolveAttendees(
-    userId: string,
-    names: string[],
-  ): Promise<Resolution> {
+  async resolveAttendees(userId: string, names: string[]): Promise<Resolution> {
     const resolved: ResolvedAttendee[] = [];
     const unresolved: string[] = [];
 

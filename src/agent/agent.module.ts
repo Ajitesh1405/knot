@@ -18,6 +18,12 @@ import { OutlookSpecialist } from './outlook.specialist';
 import { OutlookModule } from '../outlook/outlook.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { SettingsModule } from '../settings/settings.module'; // ← NEW
+import { SkillsModule } from '../skills/skills.module';
+import { SkillRegistry } from '../skills/skill.registry';
+import {
+  BUILTIN_SKILL_PROVIDERS,
+  KNOT_SKILLS_PROVIDER,
+} from '../skills/builtin-skills.provider';
 
 @Module({
   imports: [
@@ -26,6 +32,7 @@ import { SettingsModule } from '../settings/settings.module'; // ← NEW
     OutlookModule,
     CalendarModule,
     SettingsModule,
+    SkillsModule,
   ],
   controllers: [AgentController],
   providers: [
@@ -42,12 +49,17 @@ import { SettingsModule } from '../settings/settings.module'; // ← NEW
     CalendarSpecialist,
     SchedulerSpecialist,
     SchedulerHitlService,
+    // ─── Skills system: adapters + aggregation + registry ──────────
+    ...BUILTIN_SKILL_PROVIDERS,
+    KNOT_SKILLS_PROVIDER,
+    SkillRegistry,
   ],
   exports: [
     AgentService,
     ComposeHitlService,
     CalendarSpecialist,
     SchedulerHitlService,
+    SkillRegistry,
   ],
 })
 export class AgentModule {}
