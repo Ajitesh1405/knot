@@ -131,7 +131,9 @@ export function buildSchedulerGraph({
       },
       s.decision?.feedback ?? '',
     );
-    logger.log(`[${s.userId}] scheduler revised → ${r.timeHint}, ${r.durationMins}min`);
+    logger.log(
+      `[${s.userId}] scheduler revised → ${r.timeHint}, ${r.durationMins}min`,
+    );
     return {
       intent: { ...s.intent!, ...r },
       decision: undefined,
@@ -149,7 +151,11 @@ export function buildSchedulerGraph({
       withMeet: true,
     });
     logger.log(`[${s.userId}] scheduled event ${res.id}`);
-    return { status: 'scheduled', meetLink: res.hangoutLink, htmlLink: res.htmlLink };
+    return {
+      status: 'scheduled',
+      meetLink: res.hangoutLink,
+      htmlLink: res.htmlLink,
+    };
   };
 
   const cancelled = (s: typeof SchedulerState.State) => {

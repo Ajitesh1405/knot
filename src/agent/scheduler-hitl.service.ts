@@ -58,9 +58,12 @@ export class SchedulerHitlService implements OnModuleInit {
 
   async onModuleInit() {
     // Same dedicated schema as compose — keeps Prisma's `public` clean.
-    this.checkpointer = PostgresSaver.fromConnString(process.env.DATABASE_URL!, {
-      schema: 'langgraph',
-    });
+    this.checkpointer = PostgresSaver.fromConnString(
+      process.env.DATABASE_URL!,
+      {
+        schema: 'langgraph',
+      },
+    );
     // Serialized against the compose graph's setup — see checkpointer-setup.util.
     await serializeCheckpointerSetup(() => this.checkpointer.setup()); // idempotent; shares the checkpoint tables
     this.graph = buildSchedulerGraph({
@@ -99,13 +102,16 @@ export class SchedulerHitlService implements OnModuleInit {
   }
 
   approve(draftId: string) {
-    return this.resume(draftId, { action: 'send' } as SchedulerDecision);
+    return this.resume(draftId, { action: 'send' });
   }
   cancel(draftId: string) {
-    return this.resume(draftId, { action: 'cancel' } as SchedulerDecision);
+    return this.resume(draftId, { action: 'cancel' });
   }
   applyEdit(draftId: string, feedback: string) {
-    return this.resume(draftId, { action: 'edit', feedback } as SchedulerDecision);
+    return this.resume(draftId, {
+      action: 'edit',
+      feedback,
+    });
   }
   provideEmail(draftId: string, text: string) {
     return this.resume(draftId, text); // askEmail resumes with the raw text
@@ -159,14 +165,22 @@ export class SchedulerHitlService implements OnModuleInit {
       if (intr?.value) {
         const payload = intr.value;
         const status =
-          payload.kind === 'need_email' ? 'awaiting_email' : 'awaiting_approval';
+          payload.kind === 'need_email'
+            ? 'awaiting_email'
+            : 'awaiting_approval';
         const summary =
           payload.kind === 'approve_meeting' ? payload.proposal.summary : '';
         await this.db.meetingDraft.update({
           where: { id: draftId },
           data: { status, summary },
         });
-        this.events$.next({ kind: 'interrupt', userId, chatId, draftId, payload });
+        this.events$.next({
+          kind: 'interrupt',
+          userId,
+          chatId,
+          draftId,
+          payload,
+        });
         return;
       }
 

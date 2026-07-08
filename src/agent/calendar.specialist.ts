@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { Runnable } from '@langchain/core/runnables';
-import { CalendarService, CalRange, Meeting } from '../calendar/calendar.service';
+import {
+  CalendarService,
+  CalRange,
+  Meeting,
+} from '../calendar/calendar.service';
 import { BriefingService } from '../calendar/briefing.service';
 import { GraphService } from '../graph/graph.service';
 import { LlmService } from 'src/llm/llm.service';

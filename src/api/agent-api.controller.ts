@@ -35,10 +35,7 @@ export class AgentApiController {
   // ─── Chat with the assistant ───────────────────────────────────
   @Post('message')
   @HttpCode(200)
-  async message(
-    @CurrentUser('userId') userId: string,
-    @Body() body: unknown,
-  ) {
+  async message(@CurrentUser('userId') userId: string, @Body() body: unknown) {
     const { text } = parseBody(messageSchema, body);
     const answer = await this.agent.handle(userId, text);
     return { answer };
@@ -56,9 +53,9 @@ export class AgentApiController {
     @CurrentUser('userId') userId: string,
     @Query('range') range?: string,
   ) {
-    const tr: MeetingRange = (['today', 'tomorrow', 'this_week'] as const).includes(
-      range as MeetingRange,
-    )
+    const tr: MeetingRange = (
+      ['today', 'tomorrow', 'this_week'] as const
+    ).includes(range as MeetingRange)
       ? (range as MeetingRange)
       : 'today';
     const text = await this.calendar.run(userId, `meetings ${tr}`, {
@@ -85,10 +82,7 @@ export class AgentApiController {
 
   @Post('drafts/:id/cancel')
   @HttpCode(200)
-  async cancel(
-    @CurrentUser('userId') userId: string,
-    @Param('id') id: string,
-  ) {
+  async cancel(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     await this.assertOwnsDraft(userId, id);
     return this.composeHitl.cancel(id);
   }

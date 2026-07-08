@@ -21,7 +21,9 @@ export class JwtAuthGuard implements CanActivate {
     const header = req.headers['authorization'] ?? '';
     const [scheme, token] = header.split(' ');
     if (scheme !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Missing or malformed Authorization header');
+      throw new UnauthorizedException(
+        'Missing or malformed Authorization header',
+      );
     }
     try {
       req.user = this.auth.verifyAccess(token);

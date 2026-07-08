@@ -76,6 +76,21 @@ model MeetingBriefing {
   @@unique([userId, eventId])
 }
 
+// ─── Per-user skill enable/disable (Skills system) ───────────────
+// A row exists only when a user has toggled a skill away from its
+// default; absence means "enabled". Scoped per user for isolation.
+model SkillSetting {
+  id        String   @id @default(cuid())
+  userId    String
+  skill     String
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([userId, skill])
+  @@index([userId])
+}
+
 // ─── Last-seen Gmail message ID per user — so we know what's NEW ──
 model GmailWatermark {
   id              String   @id @default(cuid())

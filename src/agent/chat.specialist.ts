@@ -61,7 +61,10 @@ export class ChatSpecialist {
           }
         }
         messages.push(
-          new ToolMessage({ content: output, tool_call_id: call.id ?? call.name }),
+          new ToolMessage({
+            content: output,
+            tool_call_id: call.id ?? call.name,
+          }),
         );
       }
     }

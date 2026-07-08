@@ -100,7 +100,8 @@ export class OutlookService {
 
   private sinceFilter(timeRange: string): string | null {
     const now = Date.now();
-    if (timeRange === 'today') return new Date(now - 24 * 3600_000).toISOString();
+    if (timeRange === 'today')
+      return new Date(now - 24 * 3600_000).toISOString();
     if (timeRange === 'this_week')
       return new Date(now - 7 * 24 * 3600_000).toISOString();
     return null; // 'all'
@@ -117,7 +118,10 @@ export class OutlookService {
       refresh_token: s.outlookRefreshToken,
     });
     // Microsoft rotates refresh tokens — persist the new one if present.
-    if (tokens.refresh_token && tokens.refresh_token !== s.outlookRefreshToken) {
+    if (
+      tokens.refresh_token &&
+      tokens.refresh_token !== s.outlookRefreshToken
+    ) {
       await this.db.userSettings.update({
         where: { userId },
         data: { outlookRefreshToken: tokens.refresh_token },
@@ -141,9 +145,14 @@ export class OutlookService {
       body,
     });
     if (!res.ok) {
-      throw new Error(`Token request failed ${res.status}: ${await res.text()}`);
+      throw new Error(
+        `Token request failed ${res.status}: ${await res.text()}`,
+      );
     }
-    return res.json() as Promise<{ access_token: string; refresh_token?: string }>;
+    return res.json() as Promise<{
+      access_token: string;
+      refresh_token?: string;
+    }>;
   }
 
   async disconnect(userId: string): Promise<void> {

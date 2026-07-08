@@ -56,9 +56,12 @@ export class ComposeHitlService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     // Own Postgres schema so the checkpointer's tables never collide with
     // Prisma's `public` schema (migrations stay clean).
-    this.checkpointer = PostgresSaver.fromConnString(process.env.DATABASE_URL!, {
-      schema: 'langgraph',
-    });
+    this.checkpointer = PostgresSaver.fromConnString(
+      process.env.DATABASE_URL!,
+      {
+        schema: 'langgraph',
+      },
+    );
     // Serialized against the scheduler graph's setup — see checkpointer-setup.util.
     await serializeCheckpointerSetup(() => this.checkpointer.setup()); // creates the schema + checkpoint tables
     this.graph = buildComposeGraph({
@@ -67,10 +70,7 @@ export class ComposeHitlService implements OnModuleInit, OnModuleDestroy {
       checkpointer: this.checkpointer,
       logger: this.logger,
     });
-    this.sweepTimer = setInterval(
-      () => void this.sweepExpired(),
-      SWEEP_MS,
-    );
+    this.sweepTimer = setInterval(() => void this.sweepExpired(), SWEEP_MS);
     this.logger.log('Compose HITL graph ready');
   }
 
@@ -131,20 +131,20 @@ export class ComposeHitlService implements OnModuleInit, OnModuleDestroy {
 
   // Convenience wrappers for the three approval actions.
   approve(draftId: string) {
-    return this.resume(draftId, { action: 'approve' } as ApproveDecision);
+    return this.resume(draftId, { action: 'approve' });
   }
   cancel(draftId: string) {
-    return this.resume(draftId, { action: 'cancel' } as ApproveDecision);
+    return this.resume(draftId, { action: 'cancel' });
   }
   applyEdit(draftId: string, correction: string) {
     return this.resume(draftId, {
       action: 'edit',
       correction,
-    } as ApproveDecision);
+    });
   }
   // Use the user's verbatim text as the email body (manual edit).
   replaceBody(draftId: string, body: string) {
-    return this.resume(draftId, { action: 'replace', body } as ApproveDecision);
+    return this.resume(draftId, { action: 'replace', body });
   }
   chooseSender(draftId: string, index: number) {
     return this.resume(draftId, { index });

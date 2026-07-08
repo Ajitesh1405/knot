@@ -34,10 +34,7 @@ export class SettingsApiController {
   }
 
   @Patch()
-  async update(
-    @CurrentUser('userId') userId: string,
-    @Body() body: unknown,
-  ) {
+  async update(@CurrentUser('userId') userId: string, @Body() body: unknown) {
     const { scope, emailRange, briefingsEnabled } = parseBody(
       settingsSchema,
       body,

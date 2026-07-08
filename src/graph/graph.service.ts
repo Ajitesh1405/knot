@@ -109,7 +109,9 @@ export class GraphService implements OnModuleInit, OnModuleDestroy {
 
     // Relationship facts, e.g. "User lives in Delhi".
     for (const e of edges) {
-      lines.push(`${e.from} ${e.type.toLowerCase().replace(/_/g, ' ')} ${e.to}`);
+      lines.push(
+        `${e.from} ${e.type.toLowerCase().replace(/_/g, ' ')} ${e.to}`,
+      );
     }
 
     // Standalone facts: nodes not connected by any edge would otherwise be
@@ -136,8 +138,9 @@ export class GraphService implements OnModuleInit, OnModuleDestroy {
   // resolve to the same node — caller passes every form it knows.
   async getFactsAbout(userId: string, aliases: string[]): Promise<string> {
     // Keep meaningful tokens only (drop 1-char noise that matches everything).
-    const terms = [...new Set(aliases.map((a) => a.toLowerCase().trim()))]
-      .filter((a) => a.length >= 3);
+    const terms = [
+      ...new Set(aliases.map((a) => a.toLowerCase().trim())),
+    ].filter((a) => a.length >= 3);
     if (terms.length === 0) return '(nothing known about them yet)';
 
     const session = this.driver.session();
