@@ -60,14 +60,17 @@ export class OutlookSpecialist {
       [
         'system',
         'You summarize Outlook emails for a busy user on Telegram. ' +
-          "Write naturally, like texting a friend.\n" +
+          'Write naturally, like texting a friend.\n' +
           'RULES:\n' +
           '- Lead with the most important: real personal messages, deadlines.\n' +
           '- Group similar emails. Skip obvious automated mail.\n' +
           '- Short sentences. No markdown headers. Max 5 short lines.\n' +
           '- Emojis sparingly: 📧 new mail, ⏰ deadlines, 🎯 action items.',
       ],
-      ['user', 'Time range: {timeRange}\n\nEmails:\n{emails}\n\nUser asked: {question}'],
+      [
+        'user',
+        'Time range: {timeRange}\n\nEmails:\n{emails}\n\nUser asked: {question}',
+      ],
     ])
       .pipe(model)
       .pipe(new StringOutputParser());

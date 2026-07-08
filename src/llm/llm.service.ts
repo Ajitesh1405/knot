@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatOpenAI } from '@langchain/openai';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
 type ModelTier = 'chat' | 'fast' | 'smart';
 
@@ -11,10 +12,23 @@ export class LlmService {
 
   // ─── Returns a configured model for the requested tier ──────────
   build(tier: ModelTier = 'fast'): BaseChatModel {
-    const provider = process.env.LLM_PROVIDER ?? 'anthropic';
+    const provider = process.env.LLM_PROVIDER ?? 'gemini';
     this.logger.log(`Using LLM provider: ${provider} (${tier})`);
 
     switch (provider) {
+      // Google Gemini (free tier via Google AI Studio). Default provider.
+      // Get a key at https://aistudio.google.com/apikey and set GOOGLE_API_KEY.
+      case 'gemini':
+        return new ChatGoogleGenerativeAI({
+          model:
+            tier === 'smart'
+              ? (process.env.GEMINI_SMART_MODEL ?? 'gemini-2.5-flash')
+              : (process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'),
+          // Casual chat wants a little warmth; tools/extraction stay deterministic.
+          temperature: tier === 'chat' ? 0.6 : 0,
+          apiKey: process.env.GOOGLE_API_KEY,
+        });
+
       case 'anthropic':
         return new ChatAnthropic({
           model:

@@ -8,11 +8,7 @@ import {
 } from '@langchain/langgraph';
 import type { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { GmailService } from '../gmail/gmail.service';
-import {
-  ComposeSpecialist,
-  Candidate,
-  EmailDraft,
-} from './compose.specialist';
+import { ComposeSpecialist, Candidate, EmailDraft } from './compose.specialist';
 
 // ─── What the user can decide at the approval gate ──────────────────
 export type ApproveDecision = {
@@ -112,7 +108,9 @@ export function buildComposeGraph({
     const d = s.chosen
       ? await compose.draftReply(s.userId, s.chosen, s.intent)
       : await compose.draftNew(s.userId, s.newTo!, s.intent);
-    logger.log(`[${s.userId}] draft_created → ${d.recipientName} | ${d.subject}`);
+    logger.log(
+      `[${s.userId}] draft_created → ${d.recipientName} | ${d.subject}`,
+    );
     return { draft: d };
   };
 
@@ -137,7 +135,9 @@ export function buildComposeGraph({
   // replaceBody: use the user's verbatim text as the body, then loop to approve.
   const replaceBody = (s: typeof ComposeState.State) => {
     const body = (s.decision?.body ?? '').trim();
-    logger.log(`[${s.userId}] body replaced verbatim → ${s.draft?.recipientName}`);
+    logger.log(
+      `[${s.userId}] body replaced verbatim → ${s.draft?.recipientName}`,
+    );
     return { draft: { ...s.draft!, body }, decision: undefined };
   };
 

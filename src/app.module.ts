@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module'; // ← NEW
 import { SettingsModule } from './settings/settings.module'; // ← NEW
 import { GmailModule } from './gmail/gmail.module';
 import { AuthModule } from './auth/auth.module';
+import { ApiModule } from './api/api.module';
 import { LlmModule } from './llm/llm.module';
 
 @Module({
@@ -25,6 +26,7 @@ import { LlmModule } from './llm/llm.module';
     TelegramModule,
     GmailModule,
     AuthModule,
+    ApiModule,
     LlmModule,
   ],
 })

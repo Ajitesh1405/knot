@@ -41,9 +41,36 @@ export class SettingsService {
   }
 
   async disconnectGmail(userId: string) {
-    return this.db.userSettings.update({
+    // updateMany → no-op (not a 500) if the user has no settings row yet.
+    return this.db.userSettings.updateMany({
       where: { userId },
       data: { gmailRefreshToken: null },
+    });
+  }
+
+  // ─── Per-user skill enable/disable ──────────────────────────────
+  // Absence of a row means "enabled" (the default), so the set returned
+  // here is only the skills a user has explicitly turned OFF.
+  async disabledSkills(userId: string): Promise<Set<string>> {
+    const rows = await this.db.skillSetting.findMany({
+      where: { userId, enabled: false },
+      select: { skill: true },
+    });
+    return new Set(rows.map((r) => r.skill));
+  }
+
+  async isSkillEnabled(userId: string, skill: string): Promise<boolean> {
+    const row = await this.db.skillSetting.findUnique({
+      where: { userId_skill: { userId, skill } },
+    });
+    return row?.enabled ?? true;
+  }
+
+  async setSkillEnabled(userId: string, skill: string, enabled: boolean) {
+    return this.db.skillSetting.upsert({
+      where: { userId_skill: { userId, skill } },
+      update: { enabled },
+      create: { userId, skill, enabled },
     });
   }
 }

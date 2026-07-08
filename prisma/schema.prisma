@@ -1,10 +1,27 @@
 generator client {
   provider = "prisma-client-js"
+  // "native" for local dev; the rhel target is what Vercel's Linux runtime
+  // needs — without it Prisma throws "query engine not found" at runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ─── App user accounts (mobile / web login) ──────────────────────
+// Identity for the mobile app. The rest of the system keys off a
+// string `userId`; for these accounts that id is `usr-<User.id>`
+// (mirrors the `tg-<id>` namespace used for Telegram users), so
+// Telegram and mobile users can coexist without colliding.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // ─── User settings — one row per user (for now, just you) ─────────
@@ -60,6 +77,21 @@ model MeetingBriefing {
   briefedAt DateTime @default(now())
 
   @@unique([userId, eventId])
+}
+
+// ─── Per-user skill enable/disable (Skills system) ───────────────
+// A row exists only when a user has toggled a skill away from its
+// default; absence means "enabled". Scoped per user for isolation.
+model SkillSetting {
+  id        String   @id @default(cuid())
+  userId    String
+  skill     String
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([userId, skill])
+  @@index([userId])
 }
 
 // ─── Last-seen Gmail message ID per user — so we know what's NEW ──

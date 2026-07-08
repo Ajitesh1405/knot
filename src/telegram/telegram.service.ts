@@ -19,6 +19,7 @@ import {
   SchedulerHitlService,
   SchedulerEvent,
 } from '../agent/scheduler-hitl.service';
+import { SkillRegistry } from '../skills/skill.registry';
 
 // In edit mode, only treat the message as "cancel" when it's essentially
 // JUST an abort word — NOT any sentence containing "don't" (e.g. "don't
@@ -33,6 +34,10 @@ function isCancelIntent(text: string): boolean {
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private bot!: TelegramBot;
+  // Webhook when running serverless (Vercel sets VERCEL=1) or when explicitly
+  // asked; long-polling otherwise (local dev). Polling can't work on Vercel —
+  // its functions are ephemeral, so there's no process to hold the long poll.
+  private useWebhook = false;
 
   constructor(
     private readonly agent: AgentService,
@@ -45,6 +50,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     private readonly scheduler: SchedulerHitlService,
     private readonly outlook: OutlookService,
     private readonly briefingScheduler: BriefingScheduler,
+    private readonly skills: SkillRegistry,
   ) {}
 
   async onModuleInit() {
@@ -54,7 +60,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.bot = new TelegramBot(token, { polling: true });
+    this.useWebhook =
+      process.env.TELEGRAM_MODE === 'webhook' || !!process.env.VERCEL;
+
+    // In webhook mode we create the bot with no built-in server and feed it
+    // updates manually via processUpdate() from our own HTTP endpoint. In
+    // polling mode it long-polls Telegram itself (local dev).
+    this.bot = new TelegramBot(token, { polling: !this.useWebhook });
 
     // ─── Notify the user when a pending draft auto-expires (1h) ──
     this.hitl.expired$.subscribe(({ chatId, recipient }) => {
@@ -119,7 +131,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (!base) {
         await this.bot.sendMessage(
           chatId,
-          '⚠️ PUBLIC_URL not set. Add your https tunnel (e.g. ngrok) to .env.',
+          '⚠️ PUBLIC_URL not set. Set it to your deployment URL ' +
+            '(e.g. https://your-app.vercel.app) in the environment.',
         );
         return;
       }
@@ -151,9 +164,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       async (msg, match) => {
         const userId = `tg-${msg.from?.id ?? msg.chat.id}`;
         const chatId = msg.chat.id;
-        const range = (
-          match![1] === 'week' ? 'this_week' : match![1]
-        ) as 'today' | 'tomorrow' | 'this_week';
+        const range = (match![1] === 'week' ? 'this_week' : match![1]) as
+          | 'today'
+          | 'tomorrow'
+          | 'this_week';
         await this.bot.sendChatAction(chatId, 'typing');
         const reply = await this.calendarSpec.run(userId, msg.text ?? '', {
           timeRange: range,
@@ -260,6 +274,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           '  /schedule <who + when> — set up a meeting\n' +
           '  /briefings on | off | test — pre-meeting pings\n' +
           '  /graph — open your knowledge graph\n' +
+          '  /skills — list & toggle skills\n' +
           '  /settings — show settings\n' +
           '  /scope personal | everything\n' +
           '  /range new | 30 | year | all',
@@ -276,6 +291,55 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           `  email range: ${s.emailRange}`,
       );
     });
+
+    // ─── /skills — list loaded skills + enable/disable ─────────
+    this.bot.onText(
+      /^\/skills(?:\s+(enable|disable)\s+([a-z][a-z0-9_]*))?$/i,
+      async (msg, match) => {
+        const userId = `tg-${msg.from?.id ?? msg.chat.id}`;
+        const chatId = msg.chat.id;
+        const action = match?.[1]?.toLowerCase();
+        const target = match?.[2]?.toLowerCase();
+
+        if (action && target) {
+          if (!this.skills.isRegistered(target)) {
+            await this.bot.sendMessage(
+              chatId,
+              `🤔 No skill named "${target}". Send /skills to see them.`,
+            );
+            return;
+          }
+          await this.settings.setSkillEnabled(
+            userId,
+            target,
+            action === 'enable',
+          );
+          await this.bot.sendMessage(
+            chatId,
+            `${action === 'enable' ? '✅ Enabled' : '🚫 Disabled'} skill "${target}".`,
+          );
+          return;
+        }
+
+        const disabled = await this.settings.disabledSkills(userId);
+        const lines = this.skills.list().map((r) => {
+          const m = r.manifest;
+          const state = !r.available
+            ? `⚠️ unavailable (${r.reason})`
+            : disabled.has(m.name)
+              ? '🚫 disabled'
+              : '✅ enabled';
+          const se = m.sideEffects ? ' 🔒 side-effects' : '';
+          return `• ${m.name} v${m.version} — ${state}${se}`;
+        });
+        await this.bot.sendMessage(
+          chatId,
+          '🧩 Skills:\n' +
+            (lines.length ? lines.join('\n') : '(none loaded)') +
+            '\n\nToggle with: /skills enable <name> | /skills disable <name>',
+        );
+      },
+    );
 
     // ─── /scope <value> ────────────────────────────────────────
     this.bot.onText(/^\/scope (personal|everything)$/, async (msg, match) => {
@@ -341,7 +405,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           outcome = await this.hitl.cancel(editing.id);
         } else if (/^ai:/i.test(text)) {
           // "ai: make it shorter" → let the model revise.
-          outcome = await this.hitl.applyEdit(editing.id, text.replace(/^ai:/i, '').trim());
+          outcome = await this.hitl.applyEdit(
+            editing.id,
+            text.replace(/^ai:/i, '').trim(),
+          );
         } else {
           // Default: use the user's text verbatim as the email body.
           outcome = await this.hitl.replaceBody(editing.id, text);
@@ -389,7 +456,33 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.bot.sendMessage(msg.chat.id, '✓ Gmail disconnected.');
     });
 
-    this.logger.log('Telegram bot started (polling mode)');
+    this.logger.log(
+      `Telegram bot started (${this.useWebhook ? 'webhook' : 'polling'} mode)`,
+    );
+  }
+
+  // ─── Webhook entrypoint ─────────────────────────────────────────────
+  // Called by TelegramWebhookController on each Telegram POST. Feeds the
+  // raw update into the bot so the same onText/on('message') handlers fire.
+  handleUpdate(update: TelegramBot.Update): void {
+    if (!this.bot) {
+      this.logger.warn('Received update but bot is not initialized');
+      return;
+    }
+    this.bot.processUpdate(update);
+  }
+
+  // Register this deployment's public URL as the Telegram webhook. Run once
+  // after deploy (POST /telegram/setup, or `npm run webhook:set`).
+  async setWebhook(): Promise<string> {
+    if (!this.bot) throw new Error('Bot not initialized (TELEGRAM_BOT_TOKEN?)');
+    const base = process.env.PUBLIC_URL;
+    if (!base) throw new Error('PUBLIC_URL not set — cannot register webhook');
+    const url = `${base.replace(/\/$/, '')}/telegram/webhook`;
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    await this.bot.setWebHook(url, secret ? { secret_token: secret } : {});
+    this.logger.log(`Webhook set to ${url}`);
+    return url;
   }
 
   // ─── HITL presentation helpers ──────────────────────────────────────
@@ -431,7 +524,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (action === 'approve') outcome = await this.hitl.approve(draftId);
       else if (action === 'cancel') outcome = await this.hitl.cancel(draftId);
       else if (action.startsWith('s'))
-        outcome = await this.hitl.chooseSender(draftId, Number(action.slice(1)));
+        outcome = await this.hitl.chooseSender(
+          draftId,
+          Number(action.slice(1)),
+        );
       else return;
 
       // Edit the existing message in place with the new state.
@@ -523,11 +619,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       });
     } else {
       const sent = await this.bot.sendMessage(chatId, text, opts);
-      await this.hitl.attachMessage(
-        draftId,
-        chatId,
-        String(sent.message_id),
-      );
+      await this.hitl.attachMessage(draftId, chatId, String(sent.message_id));
     }
   }
 
@@ -551,7 +643,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         await this.scheduler.markAwaitingEdit(draftId);
         await this.bot.answerCallbackQuery(q.id, { text: '✏️ Edit mode' });
         await this.bot.editMessageText(
-          "✏️ What should change? e.g. \"make it 1 hour\", \"try Thursday morning\".",
+          '✏️ What should change? e.g. "make it 1 hour", "try Thursday morning".',
           { chat_id: chatId, message_id: messageId },
         );
         return;
@@ -661,6 +753,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    if (this.bot) await this.bot.stopPolling();
+    // Only polling holds a long-lived connection to tear down; in webhook
+    // mode there's nothing to stop.
+    if (this.bot && !this.useWebhook) await this.bot.stopPolling();
   }
 }
