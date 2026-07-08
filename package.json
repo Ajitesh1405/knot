@@ -52,6 +52,11 @@
     "rxjs": "^7.8.1",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "@langchain/langgraph-checkpoint": {
+      "uuid": "^11.1.0"
+    }
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
