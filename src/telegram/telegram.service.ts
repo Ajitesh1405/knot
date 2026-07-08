@@ -34,6 +34,10 @@ function isCancelIntent(text: string): boolean {
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private bot!: TelegramBot;
+  // Webhook when running serverless (Vercel sets VERCEL=1) or when explicitly
+  // asked; long-polling otherwise (local dev). Polling can't work on Vercel —
+  // its functions are ephemeral, so there's no process to hold the long poll.
+  private useWebhook = false;
 
   constructor(
     private readonly agent: AgentService,
@@ -56,7 +60,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.bot = new TelegramBot(token, { polling: true });
+    this.useWebhook =
+      process.env.TELEGRAM_MODE === 'webhook' || !!process.env.VERCEL;
+
+    // In webhook mode we create the bot with no built-in server and feed it
+    // updates manually via processUpdate() from our own HTTP endpoint. In
+    // polling mode it long-polls Telegram itself (local dev).
+    this.bot = new TelegramBot(token, { polling: !this.useWebhook });
 
     // ─── Notify the user when a pending draft auto-expires (1h) ──
     this.hitl.expired$.subscribe(({ chatId, recipient }) => {
@@ -121,7 +131,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (!base) {
         await this.bot.sendMessage(
           chatId,
-          '⚠️ PUBLIC_URL not set. Add your https tunnel (e.g. ngrok) to .env.',
+          '⚠️ PUBLIC_URL not set. Set it to your deployment URL ' +
+            '(e.g. https://your-app.vercel.app) in the environment.',
         );
         return;
       }
@@ -445,7 +456,33 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.bot.sendMessage(msg.chat.id, '✓ Gmail disconnected.');
     });
 
-    this.logger.log('Telegram bot started (polling mode)');
+    this.logger.log(
+      `Telegram bot started (${this.useWebhook ? 'webhook' : 'polling'} mode)`,
+    );
+  }
+
+  // ─── Webhook entrypoint ─────────────────────────────────────────────
+  // Called by TelegramWebhookController on each Telegram POST. Feeds the
+  // raw update into the bot so the same onText/on('message') handlers fire.
+  handleUpdate(update: TelegramBot.Update): void {
+    if (!this.bot) {
+      this.logger.warn('Received update but bot is not initialized');
+      return;
+    }
+    this.bot.processUpdate(update);
+  }
+
+  // Register this deployment's public URL as the Telegram webhook. Run once
+  // after deploy (POST /telegram/setup, or `npm run webhook:set`).
+  async setWebhook(): Promise<string> {
+    if (!this.bot) throw new Error('Bot not initialized (TELEGRAM_BOT_TOKEN?)');
+    const base = process.env.PUBLIC_URL;
+    if (!base) throw new Error('PUBLIC_URL not set — cannot register webhook');
+    const url = `${base.replace(/\/$/, '')}/telegram/webhook`;
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    await this.bot.setWebHook(url, secret ? { secret_token: secret } : {});
+    this.logger.log(`Webhook set to ${url}`);
+    return url;
   }
 
   // ─── HITL presentation helpers ──────────────────────────────────────
@@ -716,6 +753,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    if (this.bot) await this.bot.stopPolling();
+    // Only polling holds a long-lived connection to tear down; in webhook
+    // mode there's nothing to stop.
+    if (this.bot && !this.useWebhook) await this.bot.stopPolling();
   }
 }

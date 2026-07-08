@@ -1,5 +1,8 @@
 generator client {
   provider = "prisma-client-js"
+  // "native" for local dev; the rhel target is what Vercel's Linux runtime
+  // needs — without it Prisma throws "query engine not found" at runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
